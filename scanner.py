@@ -20,7 +20,7 @@ Input (stdin), one object per Target row with Scanner = true:
 Output (stdout): list of hits, each the input target plus:
   {
     "listing_url", "listing_title", "price", "shipping", "total",
-    "seller", "seller_feedback", "grader_found", "grade_found",
+    "grader_found", "grade_found",
     "cert_number", "cert_ok", "found_at"
   }
 
@@ -105,6 +105,23 @@ def parse_grade(title):
     return m.group(1).upper(), float(m.group(2))
 
 
+FIRST_ED_RE = re.compile(r"\b(1st|first)\s*(ed|edition)?\b", re.I)
+SHADOWLESS_RE = re.compile(r"\bshadowless\b", re.I)
+
+
+def edition_ok(query, title):
+    """1st Ed / Shadowless / Unlimited are different cards at very different prices.
+    The query's edition words must match the listing title."""
+    q, t = query or "", title or ""
+    if FIRST_ED_RE.search(q) and not FIRST_ED_RE.search(t):
+        return False
+    if SHADOWLESS_RE.search(q) and not SHADOWLESS_RE.search(t):
+        return False
+    if re.search(r"\bunlimited\b", q, re.I) and (FIRST_ED_RE.search(t) or SHADOWLESS_RE.search(t)):
+        return False
+    return True
+
+
 def item_cert(token, item_id):
     """Fetch item aspects to find a certification number. Only called on hits."""
     try:
@@ -168,6 +185,8 @@ def scan(targets, token, psa_token, max_hits):
             price, ship, total = total_price(it)
             if total > float(t["buy_under"]):
                 continue
+            if not edition_ok(t["query"], title):
+                continue
             grader_found, grade_found = parse_grade(title)
             want_graded = (t.get("type") == "Graded")
             if want_graded:
@@ -187,7 +206,8 @@ def scan(targets, token, psa_token, max_hits):
             if want_graded:
                 calls += 1
             cert_ok = psa_verify(cert, grader_found, grade_found, psa_token)
-            seller = it.get("seller", {})
+            # No seller username/feedback: the eBay keyset is exempt from
+            # account-deletion notifications on the basis that we store no eBay user data.
             hits.append({
                 **t,
                 "listing_url": it.get("itemWebUrl"),
@@ -195,8 +215,6 @@ def scan(targets, token, psa_token, max_hits):
                 "price": price,
                 "shipping": ship,
                 "total": total,
-                "seller": seller.get("username"),
-                "seller_feedback": seller.get("feedbackPercentage"),
                 "grader_found": grader_found,
                 "grade_found": grade_found,
                 "cert_number": cert,

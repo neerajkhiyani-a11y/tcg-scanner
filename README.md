@@ -60,7 +60,7 @@ python3 scanner.py < targets.json > hits.json
 ```
 
 Each hit is the input row plus `listing_url`, `listing_title`, `price`,
-`shipping`, `total`, `seller`, `seller_feedback`, `grader_found`, `grade_found`,
+`shipping`, `total`, `grader_found`, `grade_found`,
 `cert_number`, `cert_ok`, `found_at`.
 
 ## Filters applied
@@ -69,6 +69,8 @@ Each hit is the input row plus `listing_url`, `listing_title`, `price`,
 - US sellers, USD
 - Graded targets: title must carry a grader + grade; grader must match unless `Any`; grade ≥ `min_grade`
 - Raw / sealed targets: slabbed listings and proxy/custom/digital/code-card titles are skipped
+- Edition match: "1st edition" / "shadowless" in the query must appear in the title; "unlimited" rejects 1st Ed and Shadowless titles
+- No seller data is returned or stored (keyset is exempt from eBay account-deletion notifications)
 - Max 3 hits per target (`SCANNER_MAX_PER_TARGET`)
 
 ## API budget
